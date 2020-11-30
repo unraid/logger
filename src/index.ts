@@ -26,10 +26,10 @@ export class Logger {
     public transports = transports;
 
     private prefix = '';
-    private timers = [];
+    private timers: { [key: string]: boolean } = {};
     private syslogTag = '';
     private syslogPath = '/dev/log';
-    private syslog: SysLogger;
+    private syslog: typeof SysLogger;
 
     // Replace secrets with the following
     private redact = redactSecrets('[REDACTED]', {
@@ -58,7 +58,7 @@ export class Logger {
         return `[${chalk.hex('FF4500')(lineInfo)}]`;
     }
 
-    private createSyslogger(tag, path) {
+    private createSyslogger(tag: string, path: string) {
         const syslog = new SysLogger({
             tag,
             path
