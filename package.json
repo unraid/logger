@@ -8,8 +8,9 @@
     "dist"
   ],
   "scripts": {
-    "build": "npx del ./dist && npx tsup ./src/index.ts --format esm,cjs --legacy-output --dts",
-    "prepack": "npm run build",
+    "clean": "npx del-cli ./dist",
+    "build": "npx tsup ./src/index.ts --format esm,cjs --legacy-output --dts",
+    "prepack": "npm run clean && npm run build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
