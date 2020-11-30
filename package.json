@@ -8,8 +8,8 @@
     "dist"
   ],
   "scripts": {
-    "clean": "del ./dist",
-    "build": "tsup ./src/index.ts --format esm,cjs --legacy-output --dts",
+    "clean": "./node_modules/.bin/del ./dist",
+    "build": "./node_modules/.bin/tsup ./src/index.ts --format esm,cjs --legacy-output --dts",
     "prepack": "npm run clean && npm run build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
