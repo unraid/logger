@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "build": "npx tsup ./index.ts",
+    "prepack": "npm run build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
