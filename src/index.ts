@@ -10,7 +10,7 @@ import getCurrentLine from 'get-current-line';
 import getHex from 'number-to-color/hexMap.js';
 import { redactSecrets } from 'redact-secrets';
 
-const levels = ['error', 'warn', 'info', 'debug', 'trace'] as const;
+const levels = ['error', 'warn', 'info', 'debug', 'trace', 'silly'] as const;
 const transports = ['console', 'syslog'] as const;
 
 interface Options {
@@ -20,16 +20,27 @@ interface Options {
 }
 
 export class Logger {
-    public level = (process.env.LOG_LEVEL ?? 'info') as typeof levels[number];
-    public levels = levels;
-    public transport = (process.env.DEBUG ? 'console' : 'syslog') as typeof transports[number];
-    public transports = transports;
-
     private prefix = '';
     private timers: { [key: string]: boolean } = {};
     private syslogTag = '';
     private syslogPath = '/dev/log';
     private syslog: typeof SysLogger;
+
+    public level = (process.env.LOG_LEVEL ?? 'info') as typeof levels[number];
+    public levels = levels;
+    public transport = (process.env.DEBUG ? 'console' : 'syslog') as typeof transports[number];
+    public transports = transports;
+
+    private mapping: {
+        [key: string]: 'error' | 'warn' | 'info' | 'debug' | 'trace'
+    } = {
+        error: 'error',
+        warn: 'warn',
+        info: 'info',
+        debug: 'debug',
+        trace: 'trace',
+        silly: 'debug'
+    };
 
     // Replace secrets with the following
     private redact = redactSecrets('[REDACTED]', {
@@ -101,7 +112,8 @@ export class Logger {
             // level 2 === Info
             // level 3 === Debug
             // level 4 === Trace
-            // error -> warn -> info -> debug -> trace
+            // level 5 === Silly
+            // error -> warn -> info -> debug -> trace ->
             if (index === (this.levels.length - 1)) {
                 // End of list -> loop
                 this.level = this.levels[0];
@@ -123,11 +135,12 @@ export class Logger {
     }
     
     private _log(level: typeof levels[number], message: string, args: any[]) {
+        const mappedLevel = this.mapping[level];
         if (this.transport === 'console') {
-            console[level].call(console, `[${this.addColourToString(this.colour(level), level)}] ${this.prefix}${message}`, ...this.redact.map(args));
+            console[mappedLevel].call(console, `[${this.addColourToString(this.colour(level), level)}] ${this.prefix}${message}`, ...this.redact.map(args));
         }
         if (this.transport === 'syslog') {
-            this.syslog[level](format(message, ...args.map(arg => this.redact.map(arg))));
+            this.syslog[mappedLevel](format(message, ...args.map(arg => this.redact.map(arg))));
         }
     }
 
@@ -162,6 +175,10 @@ export class Logger {
 
     trace(message: string, ...args: any[]): void {
         this.log('trace', message, args);
+    }
+
+    silly(message: string, ...args: any[]): void {
+        this.log('silly', message, args);
     }
 
     timer(name: string): void {
