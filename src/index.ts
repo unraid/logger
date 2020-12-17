@@ -28,7 +28,10 @@ export class Logger {
 
     public level = (process.env.LOG_LEVEL ?? 'info') as typeof levels[number];
     public levels = levels;
-    public transport = (process.env.DEBUG ? 'console' : 'syslog') as typeof transports[number];
+    // If LOG_TRANSPORT a valid transport then use it
+    // If not check if we're in debug mode if so then console
+    // If not use syslog
+    public transport = transports.includes(process.env.LOG_TRANSPORT as any) ? process.env.LOG_TRANSPORT : (process.env.DEBUG ? 'console' : 'syslog') as typeof transports[number];
     public transports = transports;
 
     private mapping: {
