@@ -16,6 +16,7 @@ const transports = ['console', 'syslog'] as const;
 
 interface Options {
     prefix: string;
+    prefixes: string[];
     prefixSeperator: string;
     syslogTag: string;
     syslogPath: string;
@@ -25,7 +26,7 @@ interface Options {
 }
 
 export class Logger {
-    private prefix = '';
+    private prefixes: string[] = [];
     private prefixSeperator = '/';
     private timers: { [key: string]: boolean } = {};
     private syslogTag = '';
@@ -59,8 +60,11 @@ export class Logger {
     });
 
     constructor(options: Partial<Options> = {}) {
-        // Set prefix
-        this.prefix = options.prefix ?? this.prefix;
+        // Set prefixes
+        this.prefixes = [
+            ...(options.prefixes ? options.prefixes : []),
+            ...(options.prefix ? [options.prefix] : [])
+        ];
 
         // Attempt to add syslogger
         try {
@@ -151,8 +155,9 @@ export class Logger {
         const mappedLevel = this.mapping[level];
         if (this.transport === 'console') {
             const _level = `[${this.addColourToString(this.colour(level), level)}]`;
-            const _prefix = `[${this.addColourToString(stringToColour(this.prefix), this.prefix)}]: `;
-            const _message = `${_level} ${this.prefix ? _prefix : ''}${message}`;
+            const _prefix = this.prefixes.join(this.prefixSeperator);
+            const _formattedPrefix = `[${this.addColourToString(stringToColour(_prefix), _prefix)}]: `;
+            const _message = `${_level} ${this.prefixes.length >= 1 ? _formattedPrefix : ''}${message}`;
             this.console[mappedLevel].call(this.console, _message, ...this.redact.map(args));
         }
         if (this.transport === 'syslog') {
@@ -163,7 +168,10 @@ export class Logger {
     createChild(options: Partial<Options>) {
         return new Logger({
             ...options,
-            prefix: `${this.prefix}${this.prefixSeperator}${options.prefix}`
+            prefixes: [
+                ...(this.prefixes || []),
+                ...(options.prefixes || [])
+            ]
         });
     }
 
