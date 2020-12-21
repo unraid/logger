@@ -6,6 +6,7 @@
 import { format } from 'util';
 import chalk from 'chalk';
 import SysLogger from 'ain2';
+import stringToColour from 'string-to-color';
 import getCurrentLine from 'get-current-line';
 import getHex from 'number-to-color/hexMap.js';
 import { redactSecrets } from 'redact-secrets';
@@ -15,16 +16,22 @@ const transports = ['console', 'syslog'] as const;
 
 interface Options {
     prefix: string;
+    prefixSeperator: string;
     syslogTag: string;
     syslogPath: string;
+    console: typeof console;
+    level: typeof levels[number];
+    transport: typeof transports[number];
 }
 
 export class Logger {
     private prefix = '';
+    private prefixSeperator = '/';
     private timers: { [key: string]: boolean } = {};
     private syslogTag = '';
     private syslogPath = '/dev/log';
     private syslog: typeof SysLogger;
+    private console: typeof console;
 
     public level = (process.env.LOG_LEVEL ?? 'info') as typeof levels[number];
     public levels = levels;
@@ -50,6 +57,43 @@ export class Logger {
         keys: [],
         values: []
     });
+
+    constructor(options: Partial<Options> = {}) {
+        // Set prefix
+        this.prefix = options.prefix ?? this.prefix;
+
+        // Attempt to add syslogger
+        try {
+            this.syslogTag = options.syslogTag ?? this.syslogTag;
+            this.syslogPath = options.syslogPath ?? this.syslogPath;
+            this.syslog = this.createSyslogger(this.syslogPath, this.syslogTag);
+        } catch {};
+
+        // Allow options to override defaults
+        this.console = options.console ?? console;
+        this.transport = options.transport ?? this.transport;
+            
+        // Allow log level to be cycled via SIGUSR2
+        process.on('SIGUSR2', () => {
+            const index = this.levels.indexOf(this.level);
+            // level 0 === Errors
+            // level 1 === Warnings
+            // level 2 === Info
+            // level 3 === Debug
+            // level 4 === Trace
+            // level 5 === Silly
+            // error -> warn -> info -> debug -> trace ->
+            if (index === (this.levels.length - 1)) {
+                // End of list -> loop
+                this.level = this.levels[0];
+            } else {
+                // Next level
+                this.level = this.levels[index + 1];
+            }
+        
+            this._log('debug', 'Log level updated to %s.', [this.level]);
+        });
+    }
 
     private colour(level: typeof levels[number]) {
         return getHex(this.levels.indexOf(level) / this.levels.length);
@@ -96,40 +140,6 @@ export class Logger {
         return syslog;
     }
 
-    constructor(options: Partial<Options> = {}) {
-        // Set prefix
-        this.prefix = options.prefix ?? this.prefix;
-
-        // Attempt to add syslogger
-        try {
-            this.syslogTag = options.syslogTag ?? this.syslogTag;
-            this.syslogPath = options.syslogPath ?? this.syslogPath;
-            this.syslog = this.createSyslogger(this.syslogPath, this.syslogTag);
-        } catch {};
-            
-        // Allow log level to be cycled via SIGUSR2
-        process.on('SIGUSR2', () => {
-            const index = this.levels.indexOf(this.level);
-            // level 0 === Errors
-            // level 1 === Warnings
-            // level 2 === Info
-            // level 3 === Debug
-            // level 4 === Trace
-            // level 5 === Silly
-            // error -> warn -> info -> debug -> trace ->
-            if (index === (this.levels.length - 1)) {
-                // End of list -> loop
-                this.level = this.levels[0];
-            } else {
-                // Next level
-                this.level = this.levels[index + 1];
-            }
-        
-            this._log('debug', 'Log level updated to %s.', [this.level]);
-        });
-
-    }
-
     log(level: typeof levels[number], message: string, args: any[]) {
         // Only enable logging when `this.level >= level`.
         if (this.levels.indexOf(this.level) >= this.levels.indexOf(level)) {
@@ -140,7 +150,10 @@ export class Logger {
     private _log(level: typeof levels[number], message: string, args: any[]) {
         const mappedLevel = this.mapping[level];
         if (this.transport === 'console') {
-            console[mappedLevel].call(console, `[${this.addColourToString(this.colour(level), level)}] ${this.prefix}${message}`, ...this.redact.map(args));
+            const _level = `[${this.addColourToString(this.colour(level), level)}]`;
+            const _prefix = `[${this.addColourToString(stringToColour(this.prefix), this.prefix)}] `;
+            const _message = `${_level} ${this.prefix ? _prefix : ''}${message}`;
+            this.console[mappedLevel].call(this.console, _message, ...this.redact.map(args));
         }
         if (this.transport === 'syslog') {
             this.syslog[mappedLevel](format(message, ...args.map(arg => this.redact.map(arg))));
@@ -150,7 +163,7 @@ export class Logger {
     createChild(options: Partial<Options>) {
         return new Logger({
             ...options,
-            prefix: `${this.prefix}${options.prefix}`
+            prefix: `${this.prefix}${this.prefixSeperator}${options.prefix}`
         });
     }
 
@@ -187,10 +200,10 @@ export class Logger {
     timer(name: string): void {
         if (this.timers[name]) {
             delete this.timers[name];
-            console.timeEnd.call(console, name);
+            this.console.timeEnd.call(this.console, name);
         } else {
             this.timers[name] = true;
-            console.time.call(console, name);
+            this.console.time.call(this.console, name);
         }
     }
 };
