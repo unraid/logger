@@ -151,7 +151,7 @@ export class Logger {
         const mappedLevel = this.mapping[level];
         if (this.transport === 'console') {
             const _level = `[${this.addColourToString(this.colour(level), level)}]`;
-            const _prefix = `[${this.addColourToString(stringToColour(this.prefix), this.prefix)}] `;
+            const _prefix = `[${this.addColourToString(stringToColour(this.prefix), this.prefix)}]: `;
             const _message = `${_level} ${this.prefix ? _prefix : ''}${message}`;
             this.console[mappedLevel].call(this.console, _message, ...this.redact.map(args));
         }
