@@ -1,15 +1,15 @@
+import SysLogger from 'ain2';
+import chalk from 'chalk';
+import getCurrentLine from 'get-current-line';
+import getHex from 'number-to-color/hexMap.js';
+import { redactSecrets } from 'redact-secrets';
+import stringToColour from 'string-to-color';
 /*!
  * Copyright 2019-2020 Lime Technology Inc. All rights reserved.
  * Written by: Alexis Tyler
  */
 
 import { format } from 'util';
-import chalk from 'chalk';
-import SysLogger from 'ain2';
-import stringToColour from 'string-to-color';
-import getCurrentLine from 'get-current-line';
-import getHex from 'number-to-color/hexMap.js';
-import { redactSecrets } from 'redact-secrets';
 
 const levels = ['error', 'warn', 'info', 'debug', 'trace', 'silly'] as const;
 const transports = ['console', 'syslog'] as const;
@@ -76,6 +76,7 @@ export class Logger {
         // Allow options to override defaults
         this.console = options.console ?? console;
         this.transport = options.transport ?? this.transport;
+        this.prefixSeperator = options.prefixSeperator ?? this.prefixSeperator;
             
         // Allow log level to be cycled via SIGUSR2
         process.on('SIGUSR2', () => {
@@ -155,8 +156,8 @@ export class Logger {
         const mappedLevel = this.mapping[level];
         if (this.transport === 'console') {
             const _level = `[${this.addColourToString(this.colour(level), level)}]`;
-            const _prefix = this.prefixes.join(this.prefixSeperator);
-            const _formattedPrefix = `[${this.addColourToString(stringToColour(_prefix), _prefix)}]: `;
+            const _prefix = this.prefixes.map(prefix => this.addColourToString(stringToColour(prefix), prefix)).join(this.prefixSeperator);
+            const _formattedPrefix = `[${_prefix}]: `;
             const _message = `${_level} ${this.prefixes.length >= 1 ? _formattedPrefix : ''}${message}`;
             this.console[mappedLevel].call(this.console, _message, ...this.redact.map(args));
         }
@@ -165,7 +166,7 @@ export class Logger {
         }
     }
 
-    createChild(options: Partial<Options>) {
+    createChild(options: Partial<Options> = {}) {
         return new Logger({
             ...options,
             prefixes: [
